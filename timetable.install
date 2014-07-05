@@ -1,0 +1,227 @@
+<?php
+
+/**
+ * Implements hook_schema().
+ */
+function timetable_schema() {
+  $schema['timetable_routes'] = array(
+    'description' => 'Routes.',
+    'fields' => array(
+      'rid' => array(
+        'description' => 'Route id.',
+        'type' => 'serial',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ),
+      'name' => array(
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => '',
+        'description' => 'Route name.',
+      ),
+    ),
+    'primary key' => array('rid'),
+  );
+
+  $schema['timetable_stops'] = array(
+    'description' => 'Stops.',
+    'fields' => array(
+      'sid' => array(
+        'description' => 'Stop id.',
+        'type' => 'serial',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ),
+      'name' => array(
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => '',
+        'description' => 'Route name.',
+      ),
+      'zone' => array(
+        'description' => 'Zone number.',
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ),
+    ),
+    'primary key' => array('sid'),
+  );
+
+  $schema['timetable_connection'] = array(
+    'description' => 'Stop and Route connection.',
+    'fields' => array(
+      'cid' => array(
+        'description' => 'Connection id.',
+        'type' => 'serial',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ),
+      'rid' => array(
+        'description' => 'Route id.',
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ),
+      'sid' => array(
+        'description' => 'Stop id.',
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ),
+      'pos' => array(
+        'description' => 'Orders.',
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ),
+    ),
+    'primary key' => array('cid'),
+  );
+
+  $schema['timetable_times'] = array(
+    'description' => 'Arrival times.',
+    'fields' => array(
+      'cid' => array(
+        'description' => 'Connection id.',
+        'type' => 'serial',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ),
+      'hour' => array(
+        'description' => 'Arrival hour.',
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ),
+      'minute' => array(
+        'description' => 'Arrival minute.',
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ),
+    ),
+    'primary key' => array('cid', 'hour','minute'),
+  );
+
+  return $schema;
+}
+
+/**
+ * Implements hook_install().
+ */
+function timetable_install() {
+  $routes = array(
+    'Central line' => 0,
+    'North line' => 0,
+    'South line' => 0,
+  );
+
+  foreach ($routes as $name => $rid) {
+    $row = array(
+      'name' => $name,
+    );
+    drupal_write_record('timetable_routes', $row);
+    $routes[$name] = $row['rid'];
+  }
+
+  $stops = array(
+    'Clapham' => 3,
+    'Wimbledon' => 3,
+    'Northerd' => 2,
+    'Waterloo' => 2,
+    'Southern' => 2,
+    'South Park' => 1,
+    'North Park' => 1,
+    'Earlsfield' => 1,
+    'East Park' => 1,
+    'West Park' => 2,
+    'Green Park' => 2,
+    'Central Square' => 3,
+    'Oxford' => 3,
+    'Bank' => 4,
+    'Old Street' => 4,
+    'New Street' => 4,
+    'Baker Street' => 5,
+    'Hill Gate' => 5,
+    'Acton' => 5,
+    'Acton Town' => 5,
+  );
+
+  foreach ($stops as $name => $zone) {
+    $row = array(
+      'name' => $name,
+      'zone' => $zone,
+    );
+    drupal_write_record('timetable_stops', $row);
+    $stops[$name] = $row['sid'];
+  }
+
+  $connections = array(
+    'Central line' => array(
+      'Clapham',
+      'Wimbledon',
+      'Northerd',
+      'Waterloo',
+      'Southern',
+      'South Park',
+      'North Park',
+      'Earlsfield',
+      'East Park',
+      'West Park',
+    ),
+    'North line' => array(
+      'Green Park',
+      'Central Square',
+      'Oxford',
+      'Bank',
+      'Old Street',
+      'New Street',
+      'Baker Street',
+      'Hill Gate',
+      'Acton',
+      'Acton Town',
+    ),
+    'South line' => array(
+      'Southern',
+      'South Park',
+      'North Park',
+      'Earlsfield',
+      'East Park',
+      'West Park',
+      'Green Park',
+      'Central Square',
+      'Oxford',
+      'Bank',
+      'Old Street',
+    ),
+  );
+
+  foreach ($connections as $route => $connection_stops) {
+    $rid = $routes[$route];
+    $i = 0;
+    foreach ($connection_stops as $connection_stop) {
+      $sid = $stops[$connection_stop];
+      $row = array(
+        'pos' => ++$i,
+        'rid' => $rid,
+        'sid' => $sid,
+      );
+      drupal_write_record('timetable_connection', $row);
+      $hours = range(8, 22);
+      $minutes = array(0, 55, 5);
+      foreach ($hours as $hour) {
+        foreach ($minutes as $minute) {
+          $time_row = array(
+            'cid' => $row['cid'],
+            'hour' => $hour,
+            'minute' => $minute,
+          );
+          drupal_write_record('timetable_times', $time_row);
+        }
+      }
+    }
+  }
+}

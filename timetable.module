@@ -1,0 +1,111 @@
+<?php
+/**
+ * @file
+ * Main module.
+ */
+
+/**
+ * Implements hook_menu().
+ */
+function timetable_menu() {
+  $item['timetable'] = array(
+    'title' => 'Timetables',
+    'page callback' => 'timetable_list',
+    'access callback' => TRUE,
+  );
+  $item['timetable/%timetable'] = array(
+    'title' => 'Timetable',
+    'page callback' => 'timetable_view',
+    'page arguments' => array(1),
+    'access callback' => TRUE,
+  );
+
+  return $item;
+}
+
+/**
+ * Timetable list callback.
+ */
+function timetable_list() {
+  $results = db_select('timetable_routes', 'tr')
+    ->fields('tr', array('rid', 'name'))
+    ->execute();
+  $rows = array();
+  foreach ($results as $result) {
+    $rows[] = array(
+      l($result->name, 'timetable/' . $result->rid),
+    );
+  }
+  return array(
+    '#theme' => 'table',
+    '#rows' => $rows,
+  );
+}
+
+/**
+ * @param $rid
+ *   route id.
+ * @return stdClass
+ *   route class.
+ */
+function timetable_load($rid) {
+  $timetable = new stdClass();
+
+  $query = db_select('timetable_routes', 'tr')
+    ->fields('tr', array('name'));
+  $query->leftJoin('timetable_connection', 'tc', 'tc.rid = tr.rid');
+  $query->leftJoin('timetable_stops', 'ts', 'ts.sid = tc.sid');
+  $query->fields('ts', array('sid', 'name', 'zone'));
+  $query->leftJoin('timetable_times', 'tt', 'tt.cid = tc.cid');
+  $query->fields('tt', array('hour', 'minute'));
+  $query->orderBy('tc.pos', 'ASC');
+  $query->orderBy('tt.hour', 'ASC');
+  $query->orderBy('tt.minute', 'ASC');
+  $query->condition('tr.rid', $rid, '=');
+  $results = $query->execute();
+
+  $timetable->stops = array();
+
+  foreach ($results as $result) {
+    $timetable->stops[$result->sid]['name'] = $result->ts_name;
+    $timetable->stops[$result->sid]['zone'] = $result->zone;
+    $timetable->stops[$result->sid]['times'][] = array(
+      'hour' => $result->hour,
+      'minute' => $result->minute,
+    );
+  }
+  $timetable->name = $result->name;
+  return $timetable;
+}
+
+/**
+ * Create a Route timetable.
+ * @param stdClass $timetable
+ *   timetable object.
+ * @return array
+ *   renderable table array.
+ */
+function timetable_view($timetable) {
+  drupal_set_title($timetable->name);
+  $rows = array();
+  foreach ($timetable->stops as $stop) {
+    $times = array();
+    foreach ($stop['times'] as $time) {
+      $times[] = str_pad($time['hour'], 2, '0', STR_PAD_LEFT) . ':' . str_pad($time['minute'], 2, '0', STR_PAD_LEFT);
+    }
+    $rows[] = array(
+      $stop['name'],
+      implode(' ', $times),
+      $stop['zone'],
+    );
+  }
+  return array(
+    '#theme' => 'table',
+    '#header' => array(
+      t('Stop'),
+      t('Times'),
+      t('Zone'),
+    ),
+    '#rows' => $rows,
+  );
+}
